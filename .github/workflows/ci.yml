@@ -1,0 +1,89 @@
+name: CR Traslochi CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    name: Zero Downtime Deployment on VPS
+
+    steps:
+      - name: Deploy with Zero Downtime
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          password: ${{ secrets.KEY }}
+          debug: true
+          script: |
+            set -e  # Exit immediately if any command fails
+
+            cd /root/crtraslochi/website-frontend
+
+            # Pull delle ultime modifiche
+            git pull origin main
+
+            echo "🔨 Building new version..."
+            docker build -t crtraslochi_frontend:new .
+
+            echo "🚀 Starting new container on temporary port 5169 for health check..."
+            # Remove old temp container if exists (stop first, then remove)
+            docker stop crtraslochi_frontend_new 2>/dev/null || true
+            docker rm -f crtraslochi_frontend_new 2>/dev/null || true
+            # Stop main container to free port 5169 for testing
+            docker stop crtraslochi_frontend 2>/dev/null || true
+
+            # Wait a moment for port to be released
+            sleep 2
+
+            # Start new container on temporary port for testing
+            docker run -d --name crtraslochi_frontend_new --env-file .env -p 5169:3000 crtraslochi_frontend:new
+
+            echo "⏳ Waiting for new container to be ready..."
+            sleep 10
+
+            # Health check on temporary port
+            echo "🔍 Testing new container on port 5169..."
+            if ! curl -f http://localhost:5169 > /dev/null 2>&1; then
+              echo "❌ New container health check failed!"
+              docker logs crtraslochi_frontend_new
+              docker rm -f crtraslochi_frontend_new
+              exit 1
+            fi
+            echo "✅ New container passed health check!"
+
+            # Swap containers (small downtime)
+            echo "🔄 Swapping to new container..."
+            docker rm -f crtraslochi_frontend 2>/dev/null || true
+            docker stop crtraslochi_frontend_new
+            docker rm crtraslochi_frontend_new
+            docker run -d --name crtraslochi_frontend --env-file .env -p 5169:3000 crtraslochi_frontend:new
+
+            # Wait for container to be ready
+            echo "⏳ Waiting for container to initialize..."
+            sleep 5
+
+            echo "🧹 Cleaning up old images..."
+            docker image prune -f
+            docker rmi $(docker images crtraslochi_frontend -q | tail -n +2) 2>/dev/null || true
+
+            echo "✅ Deployment completed!"
+            docker ps | grep crtraslochi_frontend
+
+            # Health check with retry
+            echo "🔍 Checking if frontend is responding (with retry)..."
+            for i in {1..6}; do
+              if curl -f http://localhost:5169 > /dev/null 2>&1; then
+                echo "✅ Frontend is online!"
+                exit 0
+              fi
+              echo "Attempt $i/6 failed, waiting 5 seconds..."
+              sleep 5
+            done
+
+            echo "❌ Frontend check failed after 6 attempts - deployment unsuccessful!"
+            docker logs --tail 50 crtraslochi_frontend
+            exit 1

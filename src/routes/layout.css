@@ -1,0 +1,117 @@
+@import 'tailwindcss';
+@plugin '@tailwindcss/forms';
+@plugin '@tailwindcss/typography';
+
+@theme {
+	/* Brand palette — orange #EF7C00 + near-black #1A1A18 */
+	--color-cream: #f3efe7;
+	--color-paper: #fbf9f4;
+	--color-ink: #1a1a18;
+	--color-forest: #1a1a18; /* dark panels & primary buttons */
+	--color-pine: #322f2a; /* dark hover */
+	--color-green: #ef7c00; /* primary accent */
+	--color-leaf: #ff9a3d; /* lighter accent (on dark) */
+	--color-clay: #c9682f; /* deep secondary */
+	--color-haze: #e6e0d4;
+
+	--font-display: 'Bricolage Grotesque', ui-sans-serif, system-ui, sans-serif;
+	--font-sans: 'Hanken Grotesk', ui-sans-serif, system-ui, sans-serif;
+
+	--ease-soft: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@layer base {
+	html {
+		scroll-behavior: smooth;
+		-webkit-font-smoothing: antialiased;
+	}
+
+	body {
+		background-color: var(--color-cream);
+		color: var(--color-ink);
+		font-family: var(--font-sans);
+		font-feature-settings: 'ss01';
+	}
+
+	::selection {
+		background-color: var(--color-green);
+		color: var(--color-ink);
+	}
+
+	h1,
+	h2,
+	h3,
+	h4 {
+		font-family: var(--font-display);
+		letter-spacing: -0.02em;
+	}
+}
+
+@layer utilities {
+	/* Warm paper grain over the whole page */
+	.grain::before {
+		content: '';
+		position: fixed;
+		inset: 0;
+		z-index: 1;
+		pointer-events: none;
+		opacity: 0.5;
+		mix-blend-mode: multiply;
+		background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.35'/%3E%3C/svg%3E");
+	}
+
+	.text-balance {
+		text-wrap: balance;
+	}
+
+	/* Entrance animation, triggered by intersection observer adding .in-view */
+	.reveal {
+		opacity: 0;
+		transform: translateY(28px);
+		transition:
+			opacity 0.9s var(--ease-soft),
+			transform 0.9s var(--ease-soft);
+		transition-delay: var(--reveal-delay, 0ms);
+	}
+
+	.reveal.in-view {
+		opacity: 1;
+		transform: none;
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.reveal {
+			opacity: 1;
+			transform: none;
+			transition: none;
+		}
+
+		html {
+			scroll-behavior: auto;
+		}
+	}
+
+	.marquee-track {
+		animation: marquee 32s linear infinite;
+	}
+
+	@keyframes marquee {
+		to {
+			transform: translateX(-50%);
+		}
+	}
+
+	@keyframes float-slow {
+		0%,
+		100% {
+			transform: translateY(0);
+		}
+		50% {
+			transform: translateY(-12px);
+		}
+	}
+
+	.float-slow {
+		animation: float-slow 6s var(--ease-soft) infinite;
+	}
+}
